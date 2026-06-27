@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editor de Inventario</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+header { background: #1a1a2e; color: #fff; padding: 18px 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+header .logo { font-size: 22px; font-weight: 700; color: #f5a623; }
+header .sub { font-size: 13px; color: #aaa; }
+.container { max-width: 980px; margin: 0 auto; padding: 28px 20px; }
+.card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+.card h2 { font-size: 14px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 16px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media(max-width:600px){ .two-col { grid-template-columns: 1fr; } }
+label.upload-area { border: 2px dashed #d0d0d0; border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+label.upload-area:hover { border-color: #f5a623; background: #fffbf2; }
+label.upload-area .icon { font-size: 32px; }
+label.upload-area p { color: #888; font-size: 13px; }
+label.upload-area strong { color: #1a1a2e; }
+.pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 8px; background: #e6f9f0; color: #1a9e5c; }
+.btn { padding: 11px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s; white-space: nowrap; }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn-yellow { background: #f5a623; color: #fff; }
+.btn-green { background: #1a9e5c; color: #fff; }
+.btn-outline { background: #fff; color: #555; border: 2px solid #ddd; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+#scanInput { flex: 1; min-width: 200px; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; outline: none; }
+#scanInput:focus { border-color: #f5a623; }
+#scanInput:disabled { background: #f5f5f5; }
+#fb { font-size: 13px; color: #888; min-height: 20px; }
+.stats { display: flex; gap: 14px; flex-wrap: wrap; }
+.stat { flex:1; min-width:100px; background:#f0f2f5; border-radius:10px; padding:14px; text-align:center; }
+.stat-n { font-size:26px; font-weight:700; }
+.stat-l { font-size:11px; color:#888; margin-top:3px; }
+.tbl-wrap { overflow-x: auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { background:#1a1a2e; color:#f5a623; padding:10px 12px; text-align:left; font-weight:600; white-space:nowrap; }
+tbody tr { border-bottom:1px solid #f0f0f0; }
+tbody tr:hover { background:#fffbf2; }
+tbody td { padding:9px 12px; vertical-align:middle; }
+.chip { background:#f0f2f5; border-radius:5px; padding:3px 8px; font-family:monospace; font-size:12px; }
+.si { width:65px; padding:5px 8px; border:2px solid #e0e0e0; border-radius:6px; font-size:14px; font-weight:700; text-align:center; outline:none; }
+.si:focus { border-color:#f5a623; }
+.xbtn { background:none; border:none; cursor:pointer; color:#c0392b; font-size:18px; padding:3px 8px; border-radius:6px; }
+.xbtn:hover { background:#fdecea; }
+.empty { text-align:center; padding:40px; color:#aaa; font-size:14px; }
+.warn { background:#fffbf2 !important; }
+.wbadge { background:#fff3cd; color:#856404; border-radius:4px; padding:2px 7px; font-size:11px; font-weight:600; }
+.nf { color:#c0392b; font-style:italic; }
+.info { background:#e8f4fd; border-radius:8px; padding:12px 16px; font-size:13px; color:#1a6a9a; margin-top:12px; }
+#toast { position:fixed; bottom:24px; right:24px; background:#1a1a2e; color:#fff; padding:13px 20px; border-radius:10px; font-size:14px; font-weight:500; box-shadow:0 4px 16px rgba(0,0,0,0.25); opacity:0; transform:translateY(10px); transition:opacity .25s, transform .25s; pointer-events:none; z-index:999; }
+#toast.show { opacity:1; transform:translateY(0); }
+#toast.tok { border-left:4px solid #1a9e5c; }
+#toast.terr { border-left:4px solid #c0392b; }
+#toast.tinfo { border-left:4px solid #f5a623; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">&#128084; EDITOR DE INVENTARIO</div>
+  <div class="sub">Lizbeth Castro &mdash; Stock real por escaneo</div>
+</header>
+<div class="container">
+
+  <div class="card">
+    <h2>&#x1F4C2; Paso 1 &mdash; Cargar archivos</h2>
+    <div class="two-col">
+      <div>
+        <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">CSV de variantes (del sistema)</p>
+        <label class="upload-area" for="inputCSV">
+          <div class="icon">&#128190;</div>
+          <p><strong>Clic aqui</strong> o arrastra</p>
+          <p>variantes_YYYYMMDD.csv</p>
+          <div id="statusCSV"></div>
+        </label>
+        <input type="file" id="inputCSV" style="display:none">
+      </div>
+      <div>
+        <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">TXT con SKUs escaneados</p>
+        <label class="upload-area" for="inputTXT">
+          <div class="icon">&#x1F4DD;</div>
+          <p><strong>Clic aqui</strong> o arrastra</p>
+          <p>Inventario_Almacen_*.txt</p>
+          <div id="statusTXT"></div>
+        </label>
+        <input type="file" id="inputTXT" style="display:none">
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn btn-yellow" id="btnImport" onclick="importarTXT()" disabled>&#x26A1; Importar SKUs del TXT</button>
+      <span id="importStatus" style="font-size:13px;color:#888;"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F4F7; Paso 2 &mdash; Agregar SKU manualmente (opcional)</h2>
+    <div class="row">
+      <input type="text" id="scanInput" placeholder="Escanea o escribe SKU y presiona Enter..." disabled autocomplete="off" spellcheck="false">
+      <button class="btn btn-yellow" onclick="processScan()" disabled id="btnScan">Agregar</button>
+    </div>
+    <div id="fb">Carga el CSV primero.</div>
+  </div>
+
+  <div class="card" id="cardStats" style="display:none">
+    <h2>&#x1F4CA; Resumen</h2>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="sSkus">0</div><div class="stat-l">SKUs con stock</div></div>
+      <div class="stat"><div class="stat-n" id="sPares">0</div><div class="stat-l">Pares totales</div></div>
+      <div class="stat"><div class="stat-n" id="sModelos">0</div><div class="stat-l">Modelos</div></div>
+      <div class="stat"><div class="stat-n" id="sNoEnc" style="color:#c0392b">0</div><div class="stat-l">No encontrados</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x270F;&#xFE0F; Paso 3 &mdash; Verificar stock</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>SKU</th><th>Producto</th><th>Color</th><th>Talla</th><th>Tipo</th><th>Stock</th><th></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="8"><div class="empty">Carga el CSV y el TXT para comenzar</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F4E5; Paso 4 &mdash; Descargar</h2>
+    <div class="row">
+      <button class="btn btn-green" id="btnDL" onclick="downloadCSV()" disabled>&#x2B07; CSV listo (varias tallas)</button>
+      <button class="btn btn-yellow" id="btnDLU" onclick="downloadUnicas()" disabled>&#x1F3AF; Tallas unicas</button>
+      <button class="btn btn-outline" onclick="clearAll()">&#x1F5D1; Limpiar</button>
+    </div>
+    <div class="info">
+      <strong>CSV listo:</strong> modelos con 2 o mas tallas escaneadas.<br>
+      <strong>Tallas unicas:</strong> modelos con solo UNA talla escaneada (mismo modelo y color).
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F4F8; Extra &mdash; SKUs sin foto</h2>
+    <p style="font-size:13px;color:#888;margin-bottom:14px;">Selecciona la carpeta de fotos para ver cuales SKUs no tienen imagen.</p>
+    <div class="row">
+      <label class="btn btn-outline" for="inputFotos" style="cursor:pointer;display:inline-block;">&#x1F4C1; Seleccionar carpeta de fotos</label>
+      <span id="statusFotos" style="font-size:13px;color:#888;"></span>
+    </div>
+    <input type="file" id="inputFotos" webkitdirectory multiple style="display:none">
+    <div id="faltanWrap" style="display:none;margin-top:16px;">
+      <div id="faltanStats" style="margin-bottom:12px;font-size:13px;font-weight:600;"></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>SKU</th><th>Producto</th><th>Color</th><th>Talla</th></tr></thead>
+          <tbody id="faltanBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-outline" onclick="downloadFaltantes()">&#x2B07; Descargar lista faltantes</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+var csvRows = [];
+var csvHeader = '';
+var csvBysku = {};
+var txtFile = null;
+var scanned = [];
+var scannedMap = {};
+var faltantes = [];
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show t' + (type || 'info');
+  clearTimeout(t._t);
+  t._t = setTimeout(function() { t.className = ''; }, 2800);
+}
+
+function parseCSV(line) {
+  var r = [], cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) { r.push(cur); cur = ''; }
+    else cur += c;
+  }
+  r.push(cur);
+  return r;
+}
+
+function toLine(fields) {
+  var parts = [];
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    if (f.indexOf(',') !== -1 || f.indexOf('"') !== -1)
+      parts.push('"' + f.replace(/"/g, '""') + '"');
+    else parts.push(f);
+  }
+  return parts.join(',');
+}
+
+function setupDrop(labelId, handler) {
+  var el = document.querySelector('label[for="' + labelId + '"]');
+  if (!el) return;
+  el.addEventListener('dragover', function(e) { e.preventDefault(); el.style.borderColor = '#f5a623'; });
+  el.addEventListener('dragleave', function() { el.style.borderColor = ''; });
+  el.addEventListener('drop', function(e) {
+    e.preventDefault();
+    el.style.borderColor = '';
+    var f = e.dataTransfer.files[0];
+    if (f) handler(f);
+  });
+}
+
+document.getElementById('inputCSV').addEventListener('change', function() { if (this.files[0]) loadCSV(this.files[0]); });
+document.getElementById('inputTXT').addEventListener('change', function() { if (this.files[0]) loadTXT(this.files[0]); });
+document.getElementById('inputFotos').addEventListener('change', function() { if (this.files.length) checkFotos(this.files); });
+document.getElementById('scanInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') processScan(); });
+
+setupDrop('inputCSV', loadCSV);
+setupDrop('inputTXT', loadTXT);
+
+function loadCSV(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var lines = e.target.result.split('\n');
+    csvHeader = lines[0];
+    var h = parseCSV(csvHeader);
+    var iSku = h.indexOf('sku');
+    var iStock = h.indexOf('stockDisponible');
+    var iInv = h.indexOf('inventarioActual');
+    var iTit = h.indexOf('titulo');
+    var iColor = h.indexOf('colorPrincipal');
+    var iTalla = h.indexOf('talla');
+    var iTipo = h.indexOf('tipo');
+    if (iSku === -1) { toast('No se encontro columna sku', 'err'); return; }
+    csvRows = []; csvBysku = {};
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var f = parseCSV(line);
+      var sku = f[iSku] ? f[iSku].trim() : '';
+      if (!sku) continue;
+      csvRows.push({ f: f, sku: sku, titulo: f[iTit]||'', color: f[iColor]||'', talla: f[iTalla]||'', tipo: f[iTipo]||'', iStock: iStock, iInv: iInv });
+      csvBysku[sku] = csvRows.length - 1;
+    }
+    document.getElementById('statusCSV').innerHTML = '<span class="pill">&#10003; ' + csvRows.length + ' variantes</span>';
+    document.getElementById('scanInput').disabled = false;
+    document.getElementById('btnScan').disabled = false;
+    document.getElementById('fb').textContent = 'Listo.';
+    checkReady();
+    toast('CSV cargado: ' + csvRows.length + ' variantes', 'ok');
+  };
+  reader.onerror = function() { toast('Error leyendo CSV', 'err'); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function loadTXT(file) {
+  txtFile = file;
+  document.getElementById('statusTXT').innerHTML = '<span class="pill">&#10003; ' + file.name + '</span>';
+  checkReady();
+  toast('TXT cargado', 'ok');
+}
+
+function checkReady() {
+  document.getElementById('btnImport').disabled = !(csvRows.length > 0 && txtFile !== null);
+}
+
+function importarTXT() {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var lines = e.target.result.split('\n');
+    var counts = {};
+    var total = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var v = lines[i].trim();
+      if (!v) continue;
+      counts[v] = (counts[v] || 0) + 1;
+      total++;
+    }
+    scanned = []; scannedMap = {};
+    var noEnc = 0;
+    var skus = Object.keys(counts);
+    for (var k = 0; k < skus.length; k++) {
+      var sku = skus[k];
+      var idx = csvBysku[sku];
+      var found = idx !== undefined;
+      if (!found) noEnc++;
+      var entry = { sku: sku, stock: counts[sku], found: found, titulo: found ? csvRows[idx].titulo : '', color: found ? csvRows[idx].color : '', talla: found ? csvRows[idx].talla : '', tipo: found ? csvRows[idx].tipo : '', ri: found ? idx : -1 };
+      scanned.push(entry);
+      scannedMap[sku] = scanned.length - 1;
+    }
+    renderTable(); updateStats();
+    document.getElementById('btnDL').disabled = false;
+    document.getElementById('btnDLU').disabled = false;
+    document.getElementById('cardStats').style.display = '';
+    var msg = total + ' escaneos - ' + skus.length + ' SKUs unicos';
+    if (noEnc > 0) msg += ' (' + noEnc + ' no encontrados)';
+    document.getElementById('importStatus').textContent = msg;
+    toast('Importados: ' + skus.length + ' SKUs', 'ok');
+  };
+  reader.onerror = function() { toast('Error leyendo TXT', 'err'); };
+  reader.readAsText(txtFile, 'UTF-8');
+}
+
+function processScan() {
+  var val = document.getElementById('scanInput').value.trim();
+  if (!val) return;
+  if (scannedMap[val] !== undefined) {
+    scanned[scannedMap[val]].stock += 1;
+    renderTable(); updateStats();
+    document.getElementById('fb').innerHTML = '<span style="color:#f5a623">Ya existia - stock: ' + scanned[scannedMap[val]].stock + '</span>';
+    document.getElementById('scanInput').value = '';
+    return;
+  }
+  var idx = csvBysku[val];
+  var found = idx !== undefined;
+  var entry = { sku: val, stock: 1, found: found, titulo: found ? csvRows[idx].titulo : '', color: found ? csvRows[idx].color : '', talla: found ? csvRows[idx].talla : '', tipo: found ? csvRows[idx].tipo : '', ri: found ? idx : -1 };
+  scanned.push(entry);
+  scannedMap[val] = scanned.length - 1;
+  document.getElementById('fb').innerHTML = found ? '<span style="color:#1a9e5c">&#10003; ' + entry.titulo + ' / ' + entry.color + ' / T' + entry.talla + '</span>' : '<span style="color:#c0392b">No encontrado: ' + val + '</span>';
+  document.getElementById('scanInput').value = '';
+  renderTable(); updateStats();
+  document.getElementById('btnDL').disabled = false;
+  document.getElementById('cardStats').style.display = '';
+}
+
+function renderTable() {
+  var tbody = document.getElementById('tbody');
+  if (scanned.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty">Importa el TXT o escanea SKUs</div></td></tr>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < scanned.length; i++) {
+    var item = scanned[i];
+    html += '<tr' + (item.found ? '' : ' class="warn"') + '>';
+    html += '<td style="color:#aaa;font-size:12px">' + (i+1) + '</td>';
+    html += '<td><span class="chip">' + item.sku + '</span></td>';
+    if (item.found) {
+      html += '<td style="font-weight:600">' + item.titulo + '</td><td>' + item.color + '</td><td style="text-align:center">' + item.talla + '</td><td style="color:#888">' + item.tipo + '</td>';
+    } else {
+      html += '<td colspan="4" class="nf">No encontrado <span class="wbadge">REVISAR</span></td>';
+    }
+    html += '<td><input class="si" type="number" min="0" value="' + item.stock + '" data-i="' + i + '" onchange="updStock(this)" oninput="updStock(this)"></td>';
+    html += '<td><button class="xbtn" onclick="removeItem(' + i + ')">&#x2715;</button></td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function updStock(inp) {
+  var i = parseInt(inp.getAttribute('data-i'));
+  var v = parseInt(inp.value);
+  scanned[i].stock = isNaN(v) || v < 0 ? 0 : v;
+  updateStats();
+}
+
+function removeItem(i) {
+  delete scannedMap[scanned[i].sku];
+  scanned.splice(i, 1);
+  scannedMap = {};
+  for (var j = 0; j < scanned.length; j++) scannedMap[scanned[j].sku] = j;
+  renderTable(); updateStats();
+  if (scanned.length === 0) { document.getElementById('btnDL').disabled = true; document.getElementById('cardStats').style.display = 'none'; }
+}
+
+function updateStats() {
+  var pares = 0, noEnc = 0, modelos = {};
+  for (var i = 0; i < scanned.length; i++) {
+    pares += scanned[i].stock;
+    if (!scanned[i].found) noEnc++;
+    if (scanned[i].titulo) modelos[scanned[i].titulo] = true;
+  }
+  document.getElementById('sSkus').textContent = scanned.length;
+  document.getElementById('sPares').textContent = pares;
+  document.getElementById('sModelos').textContent = Object.keys(modelos).length;
+  document.getElementById('sNoEnc').textContent = noEnc;
+}
+
+function clearAll() {
+  if (scanned.length > 0 && !confirm('Limpiar todos los SKUs?')) return;
+  scanned = []; scannedMap = {};
+  renderTable(); updateStats();
+  document.getElementById('btnDL').disabled = true;
+  document.getElementById('cardStats').style.display = 'none';
+}
+
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function ts() {
+  var d = new Date();
+  return d.getFullYear() + '' + pad(d.getMonth()+1) + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+}
+
+function getGroups() {
+  var g = {};
+  for (var i = 0; i < scanned.length; i++) {
+    if (!scanned[i].found) continue;
+    var key = scanned[i].titulo + '||' + scanned[i].color;
+    if (!g[key]) g[key] = [];
+    g[key].push(i);
+  }
+  return g;
+}
+
+function buildCSVFrom(indices) {
+  var lines = [csvHeader];
+  for (var i = 0; i < indices.length; i++) {
+    var item = scanned[indices[i]];
+    var row = csvRows[item.ri];
+    var fields = row.f.slice();
+    fields[row.iStock] = String(item.stock);
+    if (row.iInv >= 0 && fields.length > row.iInv) fields[row.iInv] = String(item.stock);
+    lines.push(toLine(fields));
+  }
+  return lines.join('\n');
+}
+
+function triggerDL(content, filename) {
+  var blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadCSV() {
+  if (scanned.length === 0) { toast('No hay SKUs', 'err'); return; }
+  var g = getGroups();
+  var indices = [];
+  for (var key in g) {
+    if (g[key].length > 1) {
+      for (var j = 0; j < g[key].length; j++) indices.push(g[key][j]);
+    }
+  }
+  if (indices.length === 0) { toast('No hay modelos con mas de una talla', 'err'); return; }
+  triggerDL(buildCSVFrom(indices), 'variantes_' + ts() + '.csv');
+  toast('CSV descargado: ' + indices.length + ' SKUs', 'ok');
+}
+
+function downloadUnicas() {
+  if (scanned.length === 0) { toast('No hay SKUs', 'err'); return; }
+  var g = getGroups();
+  var indices = [];
+  for (var key in g) {
+    if (g[key].length === 1) indices.push(g[key][0]);
+  }
+  if (indices.length === 0) { toast('No hay tallas unicas', 'err'); return; }
+  triggerDL(buildCSVFrom(indices), 'tallas_unicas_' + ts() + '.csv');
+  toast('Tallas unicas: ' + indices.length + ' modelos', 'ok');
+}
+
+function checkFotos(files) {
+  var archivos = {};
+  for (var i = 0; i < files.length; i++) {
+    var nombre = files[i].name.replace(/\.[^.]+$/, '').trim();
+    archivos[nombre] = true;
+  }
+  document.getElementById('statusFotos').textContent = files.length + ' fotos encontradas';
+  faltantes = [];
+  for (var j = 0; j < scanned.length; j++) {
+    if (!scanned[j].found) continue;
+    if (!archivos[scanned[j].sku]) faltantes.push(scanned[j]);
+  }
+  var wrap = document.getElementById('faltanWrap');
+  var stats = document.getElementById('faltanStats');
+  var tbody = document.getElementById('faltanBody');
+  wrap.style.display = '';
+  if (faltantes.length === 0) {
+    stats.style.color = '#1a9e5c';
+    stats.textContent = 'Todas las fotos estan completas';
+    tbody.innerHTML = '';
+    toast('Fotos completas', 'ok');
+    return;
+  }
+  stats.style.color = '#c0392b';
+  stats.textContent = faltantes.length + ' SKUs sin foto';
+  var html = '';
+  for (var k = 0; k < faltantes.length; k++) {
+    var f = faltantes[k];
+    html += '<tr><td style="color:#aaa;font-size:12px">' + (k+1) + '</td>';
+    html += '<td><span class="chip">' + f.sku + '</span></td>';
+    html += '<td style="font-weight:600">' + f.titulo + '</td>';
+    html += '<td>' + f.color + '</td>';
+    html += '<td style="text-align:center">' + f.talla + '</td></tr>';
+  }
+  tbody.innerHTML = html;
+  toast(faltantes.length + ' SKUs sin foto', 'err');
+}
+
+function downloadFaltantes() {
+  if (faltantes.length === 0) return;
+  var lines = ['SKU,Producto,Color,Talla'];
+  for (var i = 0; i < faltantes.length; i++) {
+    lines.push(faltantes[i].sku + ',' + faltantes[i].titulo + ',' + faltantes[i].color + ',' + faltantes[i].talla);
+  }
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'fotos_faltantes_' + ts() + '.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Lista descargada', 'ok');
+}
+</script>
+</body>
+</html>
